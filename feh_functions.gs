@@ -268,3 +268,18 @@ function findRowIndexInColumn(range, value) {
   
   return 0;
 }
+
+/* Detects changes to various sheets and manipulates data accordingly. */
+function onEdit(event) {
+  var sheet = event.source.getActiveSheet();
+  
+  if (bannerNamePattern.exec(sheet.getName()) === null) {
+    return;
+  }
+  
+  var cell = sheet.getActiveCell();
+  
+  if (cell.getColumnIndex() === 1) {
+    sheet.getRange(sheet.getFrozenRows() + 1, 1, sheet.getMaxRows() - 1, 1).sort([{column: 1, ascending: true}]);
+  }
+}
