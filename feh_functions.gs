@@ -14,8 +14,21 @@
  * the License.
  */
 
-var iStatNames = ["hp", "atk", "spd", "def", "res"];
+var iStatNames = ["HP", "ATK", "SPD", "DEF", "RES"];
 var hStatNames = ["H", "A", "S", "D", "R"];
+
+/* Creates a mapping from column names to indices for the given sheet. */
+function createColumnIndexMapping(sheet) {
+  var range = sheet.getRange(sheet.getFrozenRows(), 1, 1, sheet.getMaxColumns());
+  var values = range.getValues()[0];
+  var mapping = {};
+  
+  for (var iValue in values) {
+    mapping[values[iValue]] = parseInt(iValue) + 1;
+  }
+  
+  return mapping;
+}
 
 /* Calculates the IV (invidual values) for a hero. */
 function FEH_IV() {
@@ -26,7 +39,7 @@ function FEH_IV() {
   var indexLow = ivIndices.indexOf(2);
   
   if (indexHigh >= 0 && indexLow >= 0) {
-    return Utilities.formatString("+%s/-%s", iStatNames[indexHigh], iStatNames[indexLow]);
+    return Utilities.formatString("+%s/-%s", iStatNames[indexHigh].toLowerCase(), iStatNames[indexLow].toLowerCase());
   } else if (indexHigh === -1 && indexLow === -1) {
     return "neutral";
   } else {
@@ -59,13 +72,16 @@ function FEH_MERGES() {
 /* Computes the IV and merge profile for the inventory's current row. */
 function getIvIndicesAndMerges() {
   var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-  var iSheet = spreadsheet.getActiveSheet();
+  var iSheet = spreadsheet.getSheetByName("Inventory");
+  var iColumnIndexMapping = createColumnIndexMapping(iSheet);
   var iRowIndex = iSheet.getActiveSelection().getRowIndex();
-  var iName = spreadsheet.getRangeByName("I_name").getCell(iRowIndex, 1).getValue();
-  var iLevel = parseInt(spreadsheet.getRangeByName("I_level").getCell(iRowIndex, 1).getValue());
-  var iRarity = parseInt(spreadsheet.getRangeByName("I_rarity").getCell(iRowIndex, 1).getValue());
-  
-  var hNames = spreadsheet.getRangeByName("H_name");
+  var iName = iSheet.getRange(iRowIndex, iColumnIndexMapping["Name"]).getValue();
+  var iLevel = parseInt(iSheet.getRange(iRowIndex, iColumnIndexMapping["Level"]).getValue());
+  var iRarity = parseInt(iSheet.getRange(iRowIndex, iColumnIndexMapping["Rarity"]).getValue());
+  var hSheet = spreadsheet.getSheetByName("Heroes");
+  var hColumnIndexMapping = createColumnIndexMapping(hSheet);
+  var hNFrozenRows = hSheet.getFrozenRows();
+  var hNames = hSheet.getRange(hNFrozenRows + 1, hColumnIndexMapping["Name"], hSheet.getMaxRows() - hNFrozenRows, 1);
   var hRowIndex = findRowIndexInColumn(hNames, iName);
   
   if (hRowIndex === 0) {
@@ -77,7 +93,7 @@ function getIvIndicesAndMerges() {
   }
   
   var stats = iStatNames.map(function (statName) {
-    return parseInt(spreadsheet.getRangeByName(Utilities.formatString("I_%s", statName)).getCell(iRowIndex, 1).getValue());
+    return parseInt(iSheet.getRange(iRowIndex, iColumnIndexMapping[statName]).getValue());
   });
   
   if (iLevel === 40) {
@@ -85,10 +101,9 @@ function getIvIndicesAndMerges() {
     
     var ivs = hStatNames.map(function (statName) {
       return ivNames.map(function (ivName) {
-        return parseInt(
-          spreadsheet.getRangeByName(Utilities.formatString("H_%s%s_%d_%d", statName, ivName, iRarity, iLevel))
-          .getCell(hRowIndex, 1).getValue()
-        );
+        var columnName = Utilities.formatString("%s%s_%d_%d", statName, ivName, iRarity, iLevel);
+        
+        return parseInt(hSheet.getRange(hRowIndex, hColumnIndexMapping[columnName]).getValue());
       });
     });
   } else if (iLevel === 1) {
@@ -97,10 +112,9 @@ function getIvIndicesAndMerges() {
     
     var ivs = hStatNames.map(function (statName) {
       return ivOffsets.map(function (ivOffset) {
-        return parseInt(
-          spreadsheet.getRangeByName(Utilities.formatString("H_%sN_%d_%d", statName, iRarity, iLevel))
-          .getCell(hRowIndex, 1).getValue()
-        ) + ivOffset;
+        var columnName = Utilities.formatString("%sN_%d_%d", statName, iRarity, iLevel);
+        
+        return parseInt(hSheet.getRange(hRowIndex, hColumnIndexMapping[columnName]).getValue()) + ivOffset;
       });
     });
   } else {
@@ -270,7 +284,9 @@ function onEdit(event) {
     var cell = sheet.getActiveCell();
     
     if (cell.getColumnIndex() === 1) {
-      sheet.getRange(sheet.getFrozenRows() + 1, 1, sheet.getMaxRows() - 1, 1).sort([{column: 1, ascending: true}]);
+      var nFrozenRows = sheet.getFrozenRows();
+      
+      sheet.getRange(nFrozenRows + 1, 1, sheet.getMaxRows() - nFrozenRows, 1).sort([{column: 1, ascending: true}]);
       
       if (cell.getRowIndex() === 1) {
         sheet.setName("Banner: " + cell.getValue());
