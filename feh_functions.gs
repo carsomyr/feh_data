@@ -16,7 +16,6 @@
 
 var iStatNames = ["hp", "atk", "spd", "def", "res"];
 var hStatNames = ["H", "A", "S", "D", "R"];
-var bannerNamePattern = new RegExp("^Banner: (.*)$");
 
 /* Calculates the IV (invidual values) for a hero. */
 function FEH_IV() {
@@ -55,13 +54,6 @@ function FEH_MERGES() {
   }
   
   return mergeProfile;
-}
-
-/* Extracts the banner name from the active sheet name. */
-function BANNER_NAME() {
-  var sheetName = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet().getName();
-
-  return bannerNamePattern.exec(sheetName)[1];
 }
 
 /* Computes the IV and merge profile for the inventory's current row. */
@@ -273,13 +265,18 @@ function findRowIndexInColumn(range, value) {
 function onEdit(event) {
   var sheet = event.source.getActiveSheet();
   
-  if (bannerNamePattern.exec(sheet.getName()) === null) {
-    return;
-  }
-  
-  var cell = sheet.getActiveCell();
-  
-  if (cell.getColumnIndex() === 1) {
-    sheet.getRange(sheet.getFrozenRows() + 1, 1, sheet.getMaxRows() - 1, 1).sort([{column: 1, ascending: true}]);
+  if (sheet.getRange(1, 3).getValue() === "5* Focus") {
+    /* The sheet contains banner information. */
+    var cell = sheet.getActiveCell();
+    
+    if (cell.getColumnIndex() === 1) {
+      sheet.getRange(sheet.getFrozenRows() + 1, 1, sheet.getMaxRows() - 1, 1).sort([{column: 1, ascending: true}]);
+      
+      if (cell.getRowIndex() === 1) {
+        sheet.setName("Banner: " + cell.getValue());
+      }
+    }
+  } else if (false) {
+    /* Handle other types of sheets here. */
   }
 }
