@@ -245,8 +245,12 @@ if __FILE__ == $0
       end
 
       json_hero_stat_headers.each do |stat|
-        hero_row["#{stat.upcase} (#{rarity}*, Lv. 1)"] =
-            ((j_stats[stat] - 1)..(j_stats[stat] + 1)).to_a.reverse.join("/")
+        if j_stats_rarities_40[rarity][json_hero_stat_headers.first].size == 3
+          hero_row["#{stat.upcase} (#{rarity}*, Lv. 1)"] =
+              ((j_stats[stat] - 1)..(j_stats[stat] + 1)).to_a.reverse.join("/")
+        else
+          hero_row["#{stat.upcase} (#{rarity}*, Lv. 1)"] = j_stats[stat]
+        end
       end
     end
 
