@@ -130,7 +130,8 @@ function getIvIndicesAndMerges() {
       ivs[statIndex][2] = -1024;
     }
 
-    statsWithIndex.push([stats[statIndex], statIndex]);
+    /* Sort by *neutral* IV stats. */
+    statsWithIndex.push([ivs[statIndex][1], statIndex, stats[statIndex]]);
   }
   
   /* Sort in reverse order so that the biggest stat appears first. This is necessary for determining the merge profile.
@@ -145,9 +146,9 @@ function getIvIndicesAndMerges() {
       return 1;
     } else {
       /* If two stats are the same, then HP > ATK > SPD > DEF > RES. */
-      if (lhs[1] > rhs[1]) {
+      if (lhs[1] < rhs[1]) {
         return -1;
-      } else if (lhs[1] < rhs[1]) {
+      } else if (lhs[1] > rhs[1]) {
         return 1;
       } else {
         throw "Control should never reach here";
@@ -156,7 +157,7 @@ function getIvIndicesAndMerges() {
   });
   
   var statsSorted = statsWithIndex.map(function (tuple) {
-    return tuple[0];
+    return tuple[2];
   });
   
   var ivsSorted = statsWithIndex.map(function (tuple) {
@@ -166,10 +167,7 @@ function getIvIndicesAndMerges() {
   var ivIndexMemo = [];
   var mergeMemo = [];
   
-  assignIvAndMerges(ivIndexMemo, mergeMemo, statsSorted, ivsSorted, false, false);
-  
-  /* The IV indices either get completely filled or not at all by the dynamic programming algorithm. */
-  if (ivIndexMemo.length === 0) {
+  if (!assignIvAndMerges(ivIndexMemo, mergeMemo, statsSorted, ivsSorted, false, false)) {
     throw "Could not determine IV and merge information from hero stats; please double check your entry";
   }
   
@@ -194,19 +192,13 @@ function assignIvAndMerges(ivIndexMemo, mergeMemo, stats, ivs, boonAssigned, ban
   /* The position of the stat are we trying to assign. */
   var statIndex = ivIndexMemo.length;
   
-  if (statIndex >= 2) {
+  if (statIndex >= 1) {
     var valueFirst = mergeMemo[0];
     var valueLast = mergeMemo[statIndex - 1];
     
-    /* At least two merges between +n and +(n - 1) have been memoized. */
+    /* At least one merge has been memoized. */
     var mergedStatDiffLower = Math.max(valueFirst - 1, 0);
     var mergedStatDiffUpper = valueLast;
-  } else if (statIndex === 1) {
-    var value = mergeMemo[0];
-    
-    /* One merge of +n has been memoized. */
-    var mergedStatDiffLower = Math.max(value - 1, 0);
-    var mergedStatDiffUpper = value;
   } else {
     /* Nothing's been memoized. Allow for merged stat differences of up to +4. */
     var mergedStatDiffLower = 0;
@@ -215,6 +207,8 @@ function assignIvAndMerges(ivIndexMemo, mergeMemo, stats, ivs, boonAssigned, ban
   
   ivLoop: for (var ivIndex = 0; ivIndex < 3; ivIndex++) {
     var mergedStatDiff = stats[statIndex] - ivs[statIndex][ivIndex];
+    var subproblemBoonAssigned = boonAssigned;
+    var subproblemBaneAssigned = baneAssigned;
     
     if (mergedStatDiff >= mergedStatDiffLower && mergedStatDiff <= mergedStatDiffUpper) {
       switch (ivIndex) {
@@ -224,7 +218,7 @@ function assignIvAndMerges(ivIndexMemo, mergeMemo, stats, ivs, boonAssigned, ban
             continue ivLoop;
           }
           
-          boonAssigned = true;
+          subproblemBoonAssigned = true;
           
           break;
         case 2:
@@ -233,7 +227,7 @@ function assignIvAndMerges(ivIndexMemo, mergeMemo, stats, ivs, boonAssigned, ban
             continue ivLoop;
           }
           
-          baneAssigned = true;
+          subproblemBaneAssigned = true;
           
           break;
       }
@@ -241,18 +235,15 @@ function assignIvAndMerges(ivIndexMemo, mergeMemo, stats, ivs, boonAssigned, ban
       /* Add to the memos. */
       ivIndexMemo.push(ivIndex);
       mergeMemo.push(mergedStatDiff);
-      
-      if (ivIndexMemo.length < nStats) {
-        /* Solve the subproblem. */
-        assignIvAndMerges(ivIndexMemo, mergeMemo, stats, ivs, boonAssigned, baneAssigned);
 
-        /* The subproblem assigned all IV stats; stop backtracking. */
-        if (ivIndexMemo.length === nStats) {
-          return;
+      if (ivIndexMemo.length < nStats) {
+        /* Solve the subproblem. Stop processing if a positive result is returned. */
+        if (assignIvAndMerges(ivIndexMemo, mergeMemo, stats, ivs, subproblemBoonAssigned, subproblemBaneAssigned)) {
+          return true;
         }
       } else {
         /* All IV stats got assigned; there are no more subproblems to solve. */
-        return;
+        return true;
       }
       
       /* Backtrack by reverting the memos. */
@@ -260,6 +251,9 @@ function assignIvAndMerges(ivIndexMemo, mergeMemo, stats, ivs, boonAssigned, ban
       mergeMemo.pop();
     }
   }
+  
+  /* No subproblem returned a positive result, so return a negative result. */
+  return false;
 }
 
 /* Finds the row index of the given value in the given range. */
