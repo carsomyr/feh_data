@@ -136,16 +136,16 @@ function getIvIndicesAndMerges() {
   
   /* Sort in reverse order so that the biggest stat appears first. This is necessary for determining the merge profile.
   
-  See `http://feheroes.gamepedia.com/Merge_Allies#Merge_Stat_Bonuses`.
+  See `http://feheroes.gamepedia.com/Merge_Allies#Merge_Stat_Bonuses` (except it seems like HP is increased first).
   */
-  statsWithIndex.sort(function (lhs, rhs) {
+  statsWithIndex = [statsWithIndex[0]].concat(statsWithIndex.slice(1, 5).sort(function (lhs, rhs) {
     /* Sort in descending order. */
     if (lhs[0] > rhs[0]) {
       return -1;
     } else if (lhs[0] < rhs[0]) {
       return 1;
     } else {
-      /* If two stats are the same, then HP > ATK > SPD > DEF > RES. */
+      /* If two stats are the same, then ATK > SPD > DEF > RES. */
       if (lhs[1] < rhs[1]) {
         return -1;
       } else if (lhs[1] > rhs[1]) {
@@ -154,7 +154,7 @@ function getIvIndicesAndMerges() {
         throw "Control should never reach here";
       }
     }
-  });
+  }));
   
   var statsSorted = statsWithIndex.map(function (tuple) {
     return tuple[2];
