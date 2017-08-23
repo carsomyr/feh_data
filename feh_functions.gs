@@ -130,8 +130,7 @@ function getIvIndicesAndMerges() {
       ivs[statIndex][2] = -1024;
     }
 
-    /* Sort by *neutral* IV stats. */
-    statsWithIndex.push([ivs[statIndex][1], statIndex, stats[statIndex]]);
+    statsWithIndex.push([stats[statIndex], statIndex]);
   }
   
   /* Sort in reverse order so that the biggest stat appears first. This is necessary for determining the merge profile.
@@ -157,7 +156,7 @@ function getIvIndicesAndMerges() {
   }));
   
   var statsSorted = statsWithIndex.map(function (tuple) {
-    return tuple[2];
+    return tuple[0];
   });
   
   var ivsSorted = statsWithIndex.map(function (tuple) {
