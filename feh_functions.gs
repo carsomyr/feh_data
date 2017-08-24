@@ -16,6 +16,29 @@
 
 var iStatNames = ["HP", "ATK", "SPD", "DEF", "RES"];
 var hStatNames = ["H", "A", "S", "D", "R"];
+var ivNatures = [
+  [0, 2, 1, 1, 1],
+  [0, 1, 2, 1, 1],
+  [0, 1, 1, 2, 1],
+  [0, 1, 1, 1, 2],
+  [1, 0, 2, 1, 1],
+  [1, 0, 1, 2, 1],
+  [1, 0, 1, 1, 2],
+  [1, 1, 0, 2, 1],
+  [1, 1, 0, 1, 2],
+  [1, 1, 1, 0, 2],
+  [2, 0, 1, 1, 1],
+  [2, 1, 0, 1, 1],
+  [2, 1, 1, 0, 1],
+  [2, 1, 1, 1, 0],
+  [1, 2, 0, 1, 1],
+  [1, 2, 1, 0, 1],
+  [1, 2, 1, 1, 0],
+  [1, 1, 2, 0, 1],
+  [1, 1, 2, 1, 0],
+  [1, 1, 1, 2, 0],
+  [1, 1, 1, 1, 1]
+];
 
 /* Creates a mapping from column names to indices for the given sheet. */
 function createColumnIndexMapping(sheet) {
@@ -121,138 +144,85 @@ function getIvIndicesAndMerges() {
     throw "Hero level must be 40 or 1";
   }
   
-  var statsWithIndex = [];
-  
-  for (var statIndex in stats) {
-    if (isNaN(ivs[statIndex][0]) && isNaN(ivs[statIndex][2])) {
-      /* Fill in the missing IVs with impossible values which have no chance of being assigned. */
-      ivs[statIndex][0] = 1024;
-      ivs[statIndex][2] = -1024;
-    }
-
-    statsWithIndex.push([stats[statIndex], statIndex]);
-  }
-  
-  /* Sort in reverse order so that the biggest stat appears first. This is necessary for determining the merge profile.
-  
-  See `http://feheroes.gamepedia.com/Merge_Allies#Merge_Stat_Bonuses` (except it seems like HP is increased first).
-  */
-  statsWithIndex = [statsWithIndex[0]].concat(statsWithIndex.slice(1, 5).sort(function (lhs, rhs) {
-    /* Sort in descending order. */
-    if (lhs[0] > rhs[0]) {
-      return -1;
-    } else if (lhs[0] < rhs[0]) {
-      return 1;
-    } else {
-      /* If two stats are the same, then ATK > SPD > DEF > RES. */
-      if (lhs[1] < rhs[1]) {
-        return -1;
-      } else if (lhs[1] > rhs[1]) {
-        return 1;
-      } else {
-        throw "Control should never reach here";
-      }
-    }
-  }));
-  
-  var statsSorted = statsWithIndex.map(function (tuple) {
-    return tuple[0];
-  });
-  
-  var ivsSorted = statsWithIndex.map(function (tuple) {
-    return ivs[tuple[1]];
-  });
-  
-  var ivIndexMemo = [];
-  var mergeMemo = [];
-  
-  if (!assignIvAndMerges(ivIndexMemo, mergeMemo, statsSorted, ivsSorted, false, false)) {
-    throw "Could not determine IV and merge information from hero stats; please double check your entry";
-  }
-  
-  var ivIndices = ivIndexMemo.slice(0);
-  var merges = mergeMemo.slice(0);
-  
   for (var iStat in stats) {
-    ivIndices[statsWithIndex[iStat][1]] = ivIndexMemo[iStat];
-    merges[statsWithIndex[iStat][1]] = mergeMemo[iStat];
+    if (isNaN(ivs[iStat][0]) && isNaN(ivs[iStat][2])) {
+      /* Fill in the missing IVs with impossible values which have no chance of being assigned. */
+      ivs[iStat][0] = 1024;
+      ivs[iStat][2] = -1024;
+    }
   }
   
-  return [ivIndices, merges];
+  return assignIvAndMerges(stats, ivs);
 }
 
-/* Use dynamic programming to assign the IV.
-
-Invariants: The hero's stats are sorted in descending order, and IVs are rearranged to reflect this.
- */
-function assignIvAndMerges(ivIndexMemo, mergeMemo, stats, ivs, boonAssigned, baneAssigned) {
-  var nStats = stats.length;
-  
-  /* The position of the stat are we trying to assign. */
-  var statIndex = ivIndexMemo.length;
-  
-  if (statIndex >= 1) {
-    var valueFirst = mergeMemo[0];
-    var valueLast = mergeMemo[statIndex - 1];
+/* Searches for the IV and merge profile that explain the hero's stats. */
+function assignIvAndMerges(stats, ivs) {
+  ivLoop: for (var iIvNature in ivNatures) {
+    var ivNature = ivNatures[iIvNature];
+    var ivStatTuples = [];
+    var nStats = ivNature.length;
     
-    /* At least one merge has been memoized. */
-    var mergedStatDiffLower = Math.max(valueFirst - 1, 0);
-    var mergedStatDiffUpper = valueLast;
-  } else {
-    /* Nothing's been memoized. Allow for merged stat differences of up to +4. */
-    var mergedStatDiffLower = 0;
-    var mergedStatDiffUpper = 4;
-  }
-  
-  ivLoop: for (var ivIndex = 0; ivIndex < 3; ivIndex++) {
-    var mergedStatDiff = stats[statIndex] - ivs[statIndex][ivIndex];
-    var subproblemBoonAssigned = boonAssigned;
-    var subproblemBaneAssigned = baneAssigned;
-    
-    if (mergedStatDiff >= mergedStatDiffLower && mergedStatDiff <= mergedStatDiffUpper) {
-      switch (ivIndex) {
-        case 0:
-          /* Has the boon already been assigned? Unwind the recursion because this is illegal. */
-          if (boonAssigned) {
-            continue ivLoop;
-          }
-          
-          subproblemBoonAssigned = true;
-          
-          break;
-        case 2:
-          /* Has the bane already been assigned? Unwind the recursion because this is illegal. */
-          if (baneAssigned) {
-            continue ivLoop;
-          }
-          
-          subproblemBaneAssigned = true;
-          
-          break;
+    for (var iStat in stats) {
+      var ivStat = ivs[iStat][ivNature[iStat]];
+      var mergedStatDiff = stats[iStat] - ivStat;
+      
+      /* Bail on the current IV if the stat has an impossible value. */
+      if (!(mergedStatDiff >= 0 && mergedStatDiff <= 4)) {
+        continue ivLoop;
       }
       
-      /* Add to the memos. */
-      ivIndexMemo.push(ivIndex);
-      mergeMemo.push(mergedStatDiff);
-
-      if (ivIndexMemo.length < nStats) {
-        /* Solve the subproblem. Stop processing if a positive result is returned. */
-        if (assignIvAndMerges(ivIndexMemo, mergeMemo, stats, ivs, subproblemBoonAssigned, subproblemBaneAssigned)) {
-          return true;
-        }
-      } else {
-        /* All IV stats got assigned; there are no more subproblems to solve. */
-        return true;
-      }
-      
-      /* Backtrack by reverting the memos. */
-      ivIndexMemo.pop();
-      mergeMemo.pop();
+      ivStatTuples.push([ivStat, iStat, mergedStatDiff]);
     }
+    
+    /* Sort in reverse order so that the biggest stat appears first. This is necessary for determining the merge profile.
+    
+    See `http://feheroes.gamepedia.com/Merge_Allies#Merge_Stat_Bonuses` (except it seems like HP is increased first).
+    */
+    ivStatTuples = [ivStatTuples[0]].concat(ivStatTuples.slice(1, nStats).sort(function (lhs, rhs) {
+      /* Sort in descending order. */
+      if (lhs[0] > rhs[0]) {
+        return -1;
+      } else if (lhs[0] < rhs[0]) {
+        return 1;
+      } else {
+        /* If two stats are the same, then ATK > SPD > DEF > RES. */
+        if (lhs[1] < rhs[1]) {
+          return -1;
+        } else if (lhs[1] > rhs[1]) {
+          return 1;
+        } else {
+          throw "Control should never reach here";
+        }
+      }
+    }));
+    
+    var diff = ivStatTuples[0][2] - ivStatTuples[nStats - 1][2];
+    
+    /* Check the validity of the merge profile. */
+    
+    /* The total variation in differences in no more than 1. */
+    if (!(diff >= 0 && diff <= 1)) {
+      continue ivLoop;
+    }
+    
+    for (var iStat = 1; iStat < nStats; iStat++) {
+      /* The differences are monotonically decreasing. */
+      if (!(ivStatTuples[iStat - 1][2] >= ivStatTuples[iStat][2])) {
+        continue ivLoop;
+      }
+    }
+    
+    var merges = stats.slice(0);
+    
+    for (var iStat in stats) {
+      merges[ivStatTuples[iStat][1]] = ivStatTuples[iStat][2];
+    }
+    
+    /* Found a suitable IV and merge profile. */
+    return [ivNature, merges];
   }
   
-  /* No subproblem returned a positive result, so return a negative result. */
-  return false;
+  throw "Could not determine IV and merge information from hero stats; please double check your entry";
 }
 
 /* Finds the row index of the given value in the given range. */
