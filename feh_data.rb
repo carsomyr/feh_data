@@ -63,7 +63,7 @@ INHERIT_RESTRICTIONS_EXCLUDES_PATTERN = Regexp.new("\\AExcludes (.*)\\z")
 
 HERO_RARITIES_PATTERN = Regexp.new(
     "\\A(\\d)((?:\\-(?:\\d|))?)(" \
-      "Event: (?:Grand Hero Battle|Tempest Trials)| \\- Special| \\*| Story|" \
+      "(?:Grand Hero Battle|Tempest Trials)| \\- Special| \\*| \\- Story|" \
       ")\\z"
 )
 
