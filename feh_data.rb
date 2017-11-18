@@ -304,14 +304,18 @@ if __FILE__ == $0
       if upper_rarity > lower_rarity
 
     release_method = case m_release_method
-      when "Event: Grand Hero Battle"
-        "Grand Hero Battle"
       when " - Special"
         "Special Event"
-      when " Story"
+      when " - Story"
         "Story"
-      else
+      when "Grand Hero Battle"
+        "Grand Hero Battle"
+      when "Tempest Trials"
+        "Tempest Trials"
+      when "", " *"
         nil
+      else
+        raise "Unknown hero release method #{m_release_method.dump}"
     end
 
     hero_row["Release Method"] = release_method
