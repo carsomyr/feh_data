@@ -118,30 +118,38 @@ function getIvIndicesAndMerges() {
   var stats = iStatNames.map(function (statName) {
     return parseInt(iSheet.getRange(iRowIndex, iColumnIndexMapping[statName]).getValue());
   });
+    
+  /* Level 1 IVs differ by exactly 1. */
+  var ivOffsets = [1, 0, -1];
   
-  if (iLevel === 40) {
-    var ivNames = ["U", "N", "L"];
-    
-    var ivs = hStatNames.map(function (statName) {
-      return ivNames.map(function (ivName) {
-        var columnName = Utilities.formatString("%s%s_%d_%d", statName, ivName, iRarity, iLevel);
-        
-        return parseInt(hSheet.getRange(hRowIndex, hColumnIndexMapping[columnName]).getValue());
-      });
+  var ivs1 = hStatNames.map(function (statName) {
+    return ivOffsets.map(function (ivOffset) {
+      var columnName = Utilities.formatString("%sN_%d_%d", statName, iRarity, 1);
+      
+      return parseInt(hSheet.getRange(hRowIndex, hColumnIndexMapping[columnName]).getValue()) + ivOffset;
     });
-  } else if (iLevel === 1) {
-    /* Level 1 IVs differ by exactly 1. */
-    var ivOffsets = [1, 0, -1];
-    
-    var ivs = hStatNames.map(function (statName) {
-      return ivOffsets.map(function (ivOffset) {
-        var columnName = Utilities.formatString("%sN_%d_%d", statName, iRarity, iLevel);
-        
-        return parseInt(hSheet.getRange(hRowIndex, hColumnIndexMapping[columnName]).getValue()) + ivOffset;
+  });
+  
+  var ivs = null;
+  
+  switch (iLevel) {
+    case 40:
+      var ivNames = ["U", "N", "L"];
+      
+      ivs = hStatNames.map(function (statName) {
+        return ivNames.map(function (ivName) {
+          var columnName = Utilities.formatString("%s%s_%d_%d", statName, ivName, iRarity, iLevel);
+          
+          return parseInt(hSheet.getRange(hRowIndex, hColumnIndexMapping[columnName]).getValue());
+        });
       });
-    });
-  } else {
-    throw "Hero level must be 40 or 1";
+      
+      break;
+    case 1:
+      ivs = ivs1;
+      break;
+    default:
+      throw "Hero level must be 40 or 1";
   }
   
   for (var iStat in stats) {
@@ -152,11 +160,11 @@ function getIvIndicesAndMerges() {
     }
   }
   
-  return assignIvAndMerges(stats, ivs);
+  return assignIvAndMerges(stats, ivs, ivs1);
 }
 
 /* Searches for the IV and merge profile that explain the hero's stats. */
-function assignIvAndMerges(stats, ivs) {
+function assignIvAndMerges(stats, ivs, ivs1) {
   ivLoop: for (var iIvNature in ivNatures) {
     var ivNature = ivNatures[iIvNature];
     var ivStatTuples = [];
@@ -164,6 +172,7 @@ function assignIvAndMerges(stats, ivs) {
     
     for (var iStat in stats) {
       var ivStat = ivs[iStat][ivNature[iStat]];
+      var ivStat1 = ivs1[iStat][ivNature[iStat]];
       var mergedStatDiff = stats[iStat] - ivStat;
       
       /* Bail on the current IV if the stat has an impossible value. */
@@ -171,32 +180,32 @@ function assignIvAndMerges(stats, ivs) {
         continue ivLoop;
       }
       
-      ivStatTuples.push([ivStat, iStat, mergedStatDiff]);
+      ivStatTuples.push([ivStat, ivStat1, iStat, mergedStatDiff]);
     }
     
     /* Sort in reverse order so that the biggest stat appears first. This is necessary for determining the merge profile.
     
-    See `http://feheroes.gamepedia.com/Merge_Allies#Merge_Stat_Bonuses` (except it seems like HP is increased first).
+    See `http://feheroes.gamepedia.com/Merge_Allies#Merge_Stat_Bonuses` for a thorough explanation.
     */
-    ivStatTuples = [ivStatTuples[0]].concat(ivStatTuples.slice(1, nStats).sort(function (lhs, rhs) {
-      /* Sort in descending order. */
-      if (lhs[0] > rhs[0]) {
+    ivStatTuples = ivStatTuples.sort(function (lhs, rhs) {
+      /* Sort in descending order by level 1 stats. */
+      if (lhs[1] > rhs[1]) {
         return -1;
-      } else if (lhs[0] < rhs[0]) {
+      } else if (lhs[1] < rhs[1]) {
         return 1;
       } else {
         /* If two stats are the same, then ATK > SPD > DEF > RES. */
-        if (lhs[1] < rhs[1]) {
+        if (lhs[2] < rhs[2]) {
           return -1;
-        } else if (lhs[1] > rhs[1]) {
+        } else if (lhs[2] > rhs[2]) {
           return 1;
         } else {
           throw "Control should never reach here";
         }
       }
-    }));
+    });
     
-    var diff = ivStatTuples[0][2] - ivStatTuples[nStats - 1][2];
+    var diff = ivStatTuples[0][3] - ivStatTuples[nStats - 1][3];
     
     /* Check the validity of the merge profile. */
     
@@ -207,7 +216,7 @@ function assignIvAndMerges(stats, ivs) {
     
     for (var iStat = 1; iStat < nStats; iStat++) {
       /* The differences are monotonically decreasing. */
-      if (!(ivStatTuples[iStat - 1][2] >= ivStatTuples[iStat][2])) {
+      if (!(ivStatTuples[iStat - 1][3] >= ivStatTuples[iStat][3])) {
         continue ivLoop;
       }
     }
@@ -215,7 +224,7 @@ function assignIvAndMerges(stats, ivs) {
     var merges = stats.slice(0);
     
     for (var iStat in stats) {
-      merges[ivStatTuples[iStat][1]] = ivStatTuples[iStat][2];
+      merges[ivStatTuples[iStat][2]] = ivStatTuples[iStat][3];
     }
     
     /* Found a suitable IV and merge profile. */
