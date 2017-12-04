@@ -321,7 +321,7 @@ if __FILE__ == $0
     hero_row["Release Method"] = release_method
     hero_row["Release Date"] = j_hero["releaseDate"]
 
-    (lower_rarity..upper_rarity).each do |rarity|
+    ([lower_rarity, 3].max..upper_rarity).each do |rarity|
       hero_row["Rarity_#{rarity}"] = 1 \
         if !release_method
     end
