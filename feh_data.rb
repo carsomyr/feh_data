@@ -52,10 +52,10 @@ HEADER_MAPPING = {
 }
 
 HERO_WEAPON_TYPE_PATTERN = Regexp.new("\\A(Blue|Green|Red|Neutral)" \
-  " (Axe|Bow|Breath|Lance|Shuriken|Staff|Sword|Tome)\\z")
+  " (Axe|Bow|Breath|Lance|Dagger|Staff|Sword|Tome)\\z")
 
 SKILL_WEAPON_TYPE_PATTERN = Regexp.new("\\A(?:Blue |Green |Red |Neutral |)" \
-  "(Axe|Bow|Breath|Lance|Shuriken|Staff|Sword|Tome)\\z")
+  "(Axe|Bow|Breath|Lance|Dagger|Staff|Sword|Tome)\\z")
 
 INHERIT_RESTRICTIONS_ONLY_PATTERN = Regexp.new("\\A(.*) Only\\z")
 
