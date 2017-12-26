@@ -51,10 +51,10 @@ HEADER_MAPPING = {
     }
 }
 
-HERO_WEAPON_TYPE_PATTERN = Regexp.new("\\A(Blue|Green|Red|Neutral)" \
+HERO_WEAPON_TYPE_PATTERN = Regexp.new("\\A(Blue|Green|Red|Colorless)" \
   " (Axe|Bow|Breath|Lance|Dagger|Staff|Sword|Tome)\\z")
 
-SKILL_WEAPON_TYPE_PATTERN = Regexp.new("\\A(?:Blue |Green |Red |Neutral |)" \
+SKILL_WEAPON_TYPE_PATTERN = Regexp.new("\\A(?:Blue |Green |Red |Colorless |)" \
   "(Axe|Bow|Breath|Lance|Dagger|Staff|Sword|Tome)\\z")
 
 INHERIT_RESTRICTIONS_ONLY_PATTERN = Regexp.new("\\A(.*) Only\\z")
@@ -62,8 +62,8 @@ INHERIT_RESTRICTIONS_ONLY_PATTERN = Regexp.new("\\A(.*) Only\\z")
 INHERIT_RESTRICTIONS_EXCLUDES_PATTERN = Regexp.new("\\AExcludes (.*)\\z")
 
 HERO_RARITIES_PATTERN = Regexp.new(
-    "\\A(\\d)((?:\\-(?:\\d|))?)(" \
-      "(?:Grand Hero Battle|Tempest Trials)| \\- Special| \\*| \\- Story|" \
+    "\\A(?:(\\d)((?:\\-\\d)?)|N/A)(" \
+      "Grand Hero Battle|Tempest Trials| \\- Special| \\- Story| \\- Legendary|" \
       ")\\z"
 )
 
@@ -180,8 +180,8 @@ if __FILE__ == $0
   j_skills = j["skills"]
 
   hero_skills_by_name = Hash[
-      j_skills.map do |skill_json|
-        skill = FireEmblemHeroes::Skill.new(skill_json["name"], skill_json["spCost"], skill_json["type"])
+      j_skills.map do |j_skill|
+        skill = FireEmblemHeroes::Skill.new(j_skill["name"], j_skill["spCost"] || j_skill["cost"], j_skill["type"])
 
         [skill.name, skill]
       end.select do |_, skill|
@@ -194,7 +194,7 @@ if __FILE__ == $0
     next \
       if j_hero["releaseDate"] == "N/A"
 
-    j_weapon_type = j_hero["weaponType"]
+    j_weapon_type = j_hero["weapontype"]
     m = HERO_WEAPON_TYPE_PATTERN.match(j_weapon_type)
 
     raise "Invalid weapon type #{j_weapon_type.dump}" \
@@ -207,7 +207,7 @@ if __FILE__ == $0
     hero_row["Name"] = j_hero_name
     hero_row["Color"] = color
     hero_row["Weapon Type"] = weapon_type
-    hero_row["Movement Type"] = j_hero["moveType"]
+    hero_row["Movement Type"] = j_hero["movetype"]
 
     j_levels = j_hero["stats"]
 
@@ -282,7 +282,7 @@ if __FILE__ == $0
       end.first.name
     end
 
-    j_rarities = j_hero["rarities"].to_s
+    j_rarities = j_hero["rarity"].to_s
     m = HERO_RARITIES_PATTERN.match(j_rarities)
 
     raise "Invalid hero rarities #{j_rarities.dump}" \
@@ -290,12 +290,15 @@ if __FILE__ == $0
 
     _, m_lower_rarity, m_upper_rarity, m_release_method = m.to_a
 
-    lower_rarity = m_lower_rarity.to_i
-
     case m_upper_rarity
-      when "-", ""
+      when ""
+        lower_rarity = m_lower_rarity.to_i
         upper_rarity = lower_rarity
+      when nil
+        # This is an Askr story unit, and hence 2-star rarity.
+        lower_rarity = upper_rarity = 2
       else
+        lower_rarity = m_lower_rarity.to_i
         upper_rarity = m_upper_rarity[1..-1].to_i
     end
 
@@ -304,6 +307,8 @@ if __FILE__ == $0
       if upper_rarity > lower_rarity
 
     release_method = case m_release_method
+      when " - Legendary"
+        "Legendary Summoning Event"
       when " - Special"
         "Special Event"
       when " - Story"
@@ -312,7 +317,7 @@ if __FILE__ == $0
         "Grand Hero Battle"
       when "Tempest Trials"
         "Tempest Trials"
-      when "", " *"
+      when ""
         nil
       else
         raise "Unknown hero release method #{m_release_method.dump}"
@@ -345,8 +350,8 @@ if __FILE__ == $0
       skill_row["Effect"] = nil
     end
 
-    skill_row["SP Cost"] = j_skill["spCost"]
-    skill_row["Range"] = j_skill["range"] || j_skill["range(rng)"]
+    skill_row["SP Cost"] = j_skill["spCost"] || j_skill["cost"]
+    skill_row["Range"] = j_skill["range"]
 
     if j_weapon_type
       m = SKILL_WEAPON_TYPE_PATTERN.match(j_weapon_type)
@@ -359,7 +364,7 @@ if __FILE__ == $0
       skill_row["Weapon Type"] = nil
     end
 
-    skill_row["Weapon Might"] = j_skill["damage(mt)"]
+    skill_row["Weapon Might"] = j_skill["might"]
 
     if j_skill_type != "WEAPON"
       j_inherit_restriction = j_skill["inheritRestriction"]
