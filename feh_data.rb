@@ -112,7 +112,6 @@ SKILLS_CSV_COLUMN_NAMES = [
     "Inherit Restriction",
     "Range",
     "Weapon Might",
-    "Weapon Type",
     "Effect",
     "Available At 4*",
     "Available At 5*"
@@ -352,18 +351,6 @@ if __FILE__ == $0
 
     skill_row["SP Cost"] = j_skill["spCost"] || j_skill["cost"]
     skill_row["Range"] = j_skill["range"]
-
-    if j_weapon_type
-      m = SKILL_WEAPON_TYPE_PATTERN.match(j_weapon_type)
-
-      raise "Invalid weapon type #{j_weapon_type.dump}" \
-        if !m
-
-      skill_row["Weapon Type"] = m[1]
-    else
-      skill_row["Weapon Type"] = nil
-    end
-
     skill_row["Weapon Might"] = j_skill["might"]
 
     if j_skill_type != "WEAPON"
@@ -388,7 +375,8 @@ if __FILE__ == $0
     end
 
     [4, 5].each do |rarity|
-      skill_row["Available At #{rarity}*"] = (skills_by_rarities[rarity - 1][j_skill_name] || []).join(", ")
+      skill_row["Available At #{rarity}*"] = (skills_by_rarities[rarity - 1][j_skill_name] || []).join(", ") \
+        if j_skill_type != "SEAL"
     end
 
     skills_csv_out << skill_row
