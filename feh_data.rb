@@ -63,7 +63,7 @@ INHERIT_RESTRICTIONS_EXCLUDES_PATTERN = Regexp.new("\\AExcludes (.*)\\z")
 
 HERO_RARITIES_PATTERN = Regexp.new(
     "\\A(?:(\\d)((?:\\-\\d)?)|N/A)(" \
-      "Grand Hero Battle|Tempest Trials| \\- Special| \\- Story| \\- Legendary|" \
+      "Grand Hero Battle|Tempest Trials| \\- Event| \\- Legendary| \\- Special| \\- Story|" \
       ")\\z"
 )
 
@@ -193,7 +193,7 @@ if __FILE__ == $0
     next \
       if j_hero["releaseDate"] == "N/A"
 
-    j_weapon_type = j_hero["weapontype"]
+    j_weapon_type = j_hero["weaponType"]
     m = HERO_WEAPON_TYPE_PATTERN.match(j_weapon_type)
 
     raise "Invalid weapon type #{j_weapon_type.dump}" \
@@ -306,10 +306,12 @@ if __FILE__ == $0
       if upper_rarity > lower_rarity
 
     release_method = case m_release_method
+      when " - Event"
+        "Event"
       when " - Legendary"
         "Legendary Summoning Event"
       when " - Special"
-        "Special Event"
+        "Seasonal"
       when " - Story"
         "Story"
       when "Grand Hero Battle"
