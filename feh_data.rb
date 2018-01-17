@@ -119,8 +119,8 @@ SKILLS_CSV_COLUMN_NAMES = [
 
 if __FILE__ == $0
   opts = {
-      heroes_json: false,
-      skills_json: false,
+      output_heroes_csv: false,
+      output_skills_csv: false,
       filename: nil,
       verbose: false
   }
@@ -131,12 +131,12 @@ if __FILE__ == $0
     opt_spec.separator ""
     opt_spec.separator "optional arguments:"
 
-    opt_spec.on("--heroes-json", "output a CSV representation of the heroes JSON") do
-      opts[:heroes_json] = true
+    opt_spec.on("--heroes", "output a CSV representation of the heroes JSON") do
+      opts[:output_heroes_csv] = true
     end
 
-    opt_spec.on("--skills-json", "output a CSV representation of the skills JSON") do
-      opts[:skills_json] = true
+    opt_spec.on("--skills", "output a CSV representation of the skills JSON") do
+      opts[:output_skills_csv] = true
     end
 
     opt_spec.on("-f", "--file FILE", "the stats JSON file") do |filename|
@@ -149,11 +149,11 @@ if __FILE__ == $0
   end.parse(ARGV)
 
   filename = opts[:filename]
-  output_heroes_json = opts[:heroes_json]
-  output_skills_json = opts[:skills_json]
+  output_heroes_csv = opts[:output_heroes_csv]
+  output_skills_csv = opts[:output_skills_csv]
 
   raise "Please specify heroes or skills JSON output, but not both" \
-    if output_heroes_json == output_skills_json
+    if output_heroes_csv == output_skills_csv
 
   json_hero_stat_headers = HEADER_MAPPING[:stats].keys
   json_skill_type_headers = HEADER_MAPPING[:skill_types].keys
@@ -165,12 +165,12 @@ if __FILE__ == $0
   end
 
   heroes_csv_out = CSV.new(
-      output_heroes_json ? STDOUT : Pathname.new("/dev/null").open("wb"),
+      output_heroes_csv ? STDOUT : Pathname.new("/dev/null").open("wb"),
       headers: HEROES_CSV_COLUMN_NAMES, write_headers: true
   )
 
   skills_csv_out = CSV.new(
-      output_skills_json ? STDOUT : Pathname.new("/dev/null").open("wb"),
+      output_skills_csv ? STDOUT : Pathname.new("/dev/null").open("wb"),
       headers: SKILLS_CSV_COLUMN_NAMES, write_headers: true
   )
 
