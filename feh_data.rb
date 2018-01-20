@@ -67,6 +67,8 @@ HERO_RARITIES_PATTERN = Regexp.new(
       ")\\z"
 )
 
+FEH_RELEASE_DATE = "2017-02-02"
+
 HEROES_CSV_COLUMN_NAMES = [
     "Name",
     "Color",
@@ -325,7 +327,15 @@ if __FILE__ == $0
     end
 
     hero_row["Release Method"] = release_method
-    hero_row["Release Date"] = j_hero["releaseDate"]
+
+    release_date = j_hero["releaseDate"]
+
+    if release_date != ""
+      hero_row["Release Date"] = release_date
+    else
+      # If no release date is given, use the game's release date.
+      hero_row["Release Date"] = FEH_RELEASE_DATE
+    end
 
     ([lower_rarity, 3].max..upper_rarity).each do |rarity|
       hero_row["Rarity_#{rarity}"] = 1 \
