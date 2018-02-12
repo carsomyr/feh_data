@@ -16,6 +16,7 @@
 # the License.
 
 require "csv"
+require "date"
 require "json"
 require "net/http"
 require "optionparser"
@@ -61,11 +62,7 @@ INHERIT_RESTRICTIONS_ONLY_PATTERN = Regexp.new("\\A(.*) Only\\z")
 
 INHERIT_RESTRICTIONS_EXCLUDES_PATTERN = Regexp.new("\\AExcludes (.*)\\z")
 
-HERO_RARITIES_PATTERN = Regexp.new(
-    "\\A(?:(\\d)((?:\\-\\d)?)|N/A)(" \
-      "Grand Hero Battle|Tempest Trials| \\- Event| \\- Legendary| \\- Special| \\- Story|" \
-      ")\\z"
-)
+HERO_RARITIES_PATTERN = Regexp.new("\\A(\\d)((?:\\-\\d)?)\\z")
 
 FEH_RELEASE_DATE = "2017-02-02"
 
@@ -88,8 +85,8 @@ HEROES_CSV_COLUMN_NAMES = [
       end
     end,
     "Rarities",
-    "Release Method",
     "Release Date",
+    "Pool Date",
     *[5, 4, 3].reduce([]) do |memo, rarity|
       memo + HEADER_MAPPING[:ivs].keys.reduce([]) do |memo, iv|
         memo + HEADER_MAPPING[:stats].values.map do |stat|
@@ -283,7 +280,7 @@ if __FILE__ == $0
       end.first.name
     end
 
-    j_rarities = j_hero["rarity"].to_s
+    j_rarities = j_hero["rarities"].to_s
     m = HERO_RARITIES_PATTERN.match(j_rarities)
 
     raise "Invalid hero rarities #{j_rarities.dump}" \
@@ -307,39 +304,26 @@ if __FILE__ == $0
     hero_row["Rarities"] += "-#{upper_rarity}" \
       if upper_rarity > lower_rarity
 
-    release_method = case m_release_method
-      when " - Event"
-        "Event"
-      when " - Legendary"
-        "Legendary Summoning Event"
-      when " - Special"
-        "Seasonal"
-      when " - Story"
-        "Story"
-      when "Grand Hero Battle"
-        "Grand Hero Battle"
-      when "Tempest Trials"
-        "Tempest Trials"
-      when ""
-        nil
-      else
-        raise "Unknown hero release method #{m_release_method.dump}"
-    end
-
-    hero_row["Release Method"] = release_method
-
     release_date = j_hero["releaseDate"]
 
-    if release_date != ""
-      hero_row["Release Date"] = release_date
+    if release_date != "N/A"
+      hero_row["Release Date"] = Date.parse(release_date).iso8601
     else
       # If no release date is given, use the game's release date.
       hero_row["Release Date"] = FEH_RELEASE_DATE
     end
 
+    pool_date = j_hero["poolDate"]
+
+    if pool_date != "N/A"
+      hero_row["Pool Date"] = Date.parse(pool_date).iso8601
+    else
+      hero_row["Pool Date"] = nil
+    end
+
     ([lower_rarity, 3].max..upper_rarity).each do |rarity|
       hero_row["Rarity_#{rarity}"] = 1 \
-        if !release_method
+        if pool_date != "N/A"
     end
 
     heroes_csv_out << hero_row
