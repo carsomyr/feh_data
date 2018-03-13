@@ -188,14 +188,17 @@ if __FILE__ == $0
   ]
 
   j["heroes"].each do |j_hero|
-    # If the hero doesn't have a release date, then they shouldn't be included.
-    next \
+    j_hero["releaseDate"] = nil \
       if j_hero["releaseDate"] == "N/A"
+
+    j_hero["poolDate"] = nil \
+      if j_hero["poolDate"] == "N/A"
 
     j_weapon_type = j_hero["weaponType"]
     m = HERO_WEAPON_TYPE_PATTERN.match(j_weapon_type)
 
-    raise "Invalid weapon type #{j_weapon_type.dump}" \
+    # Skip if the hero's weapon wasn't found. This is the first sign that their wiki page isn't complete yet.
+    next \
       if !m
 
     _, color, weapon_type = m.to_a
@@ -256,6 +259,10 @@ if __FILE__ == $0
       skill_name = j_skill["name"]
       skill = hero_skills_by_name[skill_name]
 
+      # Skip if an entry for the skill wasn't found.
+      next memo \
+        if !skill
+
       (memo[skill.type] ||= []).push(skill)
 
       rarity = j_skill["rarity"]
@@ -272,58 +279,49 @@ if __FILE__ == $0
     json_skill_type_headers.each do |skill_type|
       skills = skill_type_mapping[skill_type]
 
-      next \
-        if !skills
-
-      hero_row[HEADER_MAPPING[:skill_types][skill_type]] = skills.sort do |lhs, rhs|
-        -(lhs.sp_cost <=> rhs.sp_cost)
-      end.first.name
+      if skills
+        hero_row[HEADER_MAPPING[:skill_types][skill_type]] = skills.sort do |lhs, rhs|
+          -(lhs.sp_cost <=> rhs.sp_cost)
+        end.first.name
+      end
     end
 
     j_rarities = j_hero["rarities"].to_s
     m = HERO_RARITIES_PATTERN.match(j_rarities)
 
-    raise "Invalid hero rarities #{j_rarities.dump}" \
-      if !m
+    if m
+      _, m_lower_rarity, m_upper_rarity, m_release_method = m.to_a
 
-    _, m_lower_rarity, m_upper_rarity, m_release_method = m.to_a
+      case m_upper_rarity
+        when ""
+          lower_rarity = m_lower_rarity.to_i
+          upper_rarity = lower_rarity
+        when nil
+          # This is an Askr story unit, and hence 2-star rarity.
+          lower_rarity = upper_rarity = 2
+        else
+          lower_rarity = m_lower_rarity.to_i
+          upper_rarity = m_upper_rarity[1..-1].to_i
+      end
 
-    case m_upper_rarity
-      when ""
-        lower_rarity = m_lower_rarity.to_i
-        upper_rarity = lower_rarity
-      when nil
-        # This is an Askr story unit, and hence 2-star rarity.
-        lower_rarity = upper_rarity = 2
-      else
-        lower_rarity = m_lower_rarity.to_i
-        upper_rarity = m_upper_rarity[1..-1].to_i
+      hero_row["Rarities"] = lower_rarity.to_s
+      hero_row["Rarities"] += "-#{upper_rarity}" \
+        if upper_rarity > lower_rarity
     end
-
-    hero_row["Rarities"] = lower_rarity.to_s
-    hero_row["Rarities"] += "-#{upper_rarity}" \
-      if upper_rarity > lower_rarity
 
     release_date = j_hero["releaseDate"]
 
-    if release_date != "N/A"
-      hero_row["Release Date"] = Date.parse(release_date).iso8601
-    else
-      # If no release date is given, use the game's release date.
-      hero_row["Release Date"] = FEH_RELEASE_DATE
-    end
+    hero_row["Release Date"] = Date.parse(release_date).iso8601 \
+      if release_date
 
     pool_date = j_hero["poolDate"]
 
-    if pool_date != "N/A"
+    if pool_date
       hero_row["Pool Date"] = Date.parse(pool_date).iso8601
-    else
-      hero_row["Pool Date"] = nil
-    end
 
-    ([lower_rarity, 3].max..upper_rarity).each do |rarity|
-      hero_row["Rarity_#{rarity}"] = 1 \
-        if pool_date != "N/A"
+      ([lower_rarity, 3].max..upper_rarity).each do |rarity|
+        hero_row["Rarity_#{rarity}"] = 1
+      end
     end
 
     heroes_csv_out << hero_row
