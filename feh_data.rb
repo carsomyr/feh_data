@@ -24,11 +24,11 @@ require "pathname"
 
 module FireEmblemHeroes
   class Skill
-    attr_reader :name, :sp_cost, :type
+    attr_reader :name, :sp, :type
 
-    def initialize(name, sp_cost, type)
+    def initialize(name, sp, type)
       @name = name
-      @sp_cost = sp_cost
+      @sp = sp
       @type = type
     end
   end
@@ -43,9 +43,9 @@ HEADER_MAPPING = {
         "hp" => "H", "atk" => "A", "spd" => "S", "def" => "D", "res" => "R"
     },
     skill_types: {
-        "WEAPON" => "Weapon", "ASSIST" => "Assist", "SPECIAL" => "Special",
-        "PASSIVE_A" => "A Passive", "PASSIVE_B" => "B Passive", "PASSIVE_C" => "C Passive",
-        "SEAL" => "Seal"
+        "weapon" => "Weapon", "assist" => "Assist", "special" => "Special",
+        "passivea" => "A Passive", "passiveb" => "B Passive", "passivec" => "C Passive",
+        "sacredseal" => "Seal"
     },
     ivs: {
         "N" => 1, "U" => 2, "L" => 0
@@ -57,10 +57,6 @@ HERO_WEAPON_TYPE_PATTERN = Regexp.new("\\A(Blue|Green|Red|Colorless)" \
 
 SKILL_WEAPON_TYPE_PATTERN = Regexp.new("\\A(?:Blue |Green |Red |Colorless |)" \
   "(Axe|Bow|Breath|Lance|Dagger|Staff|Sword|Tome)\\z")
-
-INHERIT_RESTRICTIONS_ONLY_PATTERN = Regexp.new("\\A(.*) Only\\z")
-
-INHERIT_RESTRICTIONS_EXCLUDES_PATTERN = Regexp.new("\\AExcludes (.*)\\z")
 
 HERO_RARITIES_PATTERN = Regexp.new("\\A(\\d)((?:\\-\\d)?)\\z")
 
@@ -107,10 +103,9 @@ HEROES_CSV_COLUMN_NAMES = [
 SKILLS_CSV_COLUMN_NAMES = [
     "Name",
     "Type",
-    "SP Cost",
-    "Inherit Restriction",
+    "SP",
     "Range",
-    "Weapon Might",
+    "Might",
     "Effect",
     "Available At 4*",
     "Available At 5*"
@@ -179,11 +174,11 @@ if __FILE__ == $0
 
   hero_skills_by_name = Hash[
       j_skills.map do |j_skill|
-        skill = FireEmblemHeroes::Skill.new(j_skill["name"], j_skill["spCost"] || j_skill["cost"], j_skill["type"])
+        skill = FireEmblemHeroes::Skill.new(j_skill["name"], j_skill["sp"], j_skill["type"])
 
         [skill.name, skill]
       end.select do |_, skill|
-        skill.type != "SEAL"
+        skill.type != "sacredseal"
       end
   ]
 
@@ -208,7 +203,7 @@ if __FILE__ == $0
     hero_row["Name"] = j_hero_name
     hero_row["Color"] = color
     hero_row["Weapon Type"] = weapon_type
-    hero_row["Movement Type"] = j_hero["movetype"]
+    hero_row["Movement Type"] = j_hero["moveType"]
 
     j_levels = j_hero["stats"]
 
@@ -268,9 +263,9 @@ if __FILE__ == $0
       rarity = j_skill["rarity"]
 
       case rarity
-        when 4, 5
-          (skills_by_rarities[rarity.to_i - 1][skill_name] ||= []).push(j_hero_name) \
-            if skill_name.end_with?(" 3")
+      when 4, 5
+        (skills_by_rarities[rarity.to_i - 1][skill_name] ||= []).push(j_hero_name) \
+          if skill_name.end_with?(" 3")
       end
 
       memo
@@ -281,7 +276,7 @@ if __FILE__ == $0
 
       if skills
         hero_row[HEADER_MAPPING[:skill_types][skill_type]] = skills.sort do |lhs, rhs|
-          -(lhs.sp_cost <=> rhs.sp_cost)
+          -((lhs.sp || 0) <=> (rhs.sp || 0))
         end.first.name
       end
     end
@@ -293,15 +288,15 @@ if __FILE__ == $0
       _, m_lower_rarity, m_upper_rarity, m_release_method = m.to_a
 
       case m_upper_rarity
-        when ""
-          lower_rarity = m_lower_rarity.to_i
-          upper_rarity = lower_rarity
-        when nil
-          # This is an Askr story unit, and hence 2-star rarity.
-          lower_rarity = upper_rarity = 2
-        else
-          lower_rarity = m_lower_rarity.to_i
-          upper_rarity = m_upper_rarity[1..-1].to_i
+      when ""
+        lower_rarity = m_lower_rarity.to_i
+        upper_rarity = lower_rarity
+      when nil
+        # This is an Askr story unit, and hence 2-star rarity.
+        lower_rarity = upper_rarity = 2
+      else
+        lower_rarity = m_lower_rarity.to_i
+        upper_rarity = m_upper_rarity[1..-1].to_i
       end
 
       hero_row["Rarities"] = lower_rarity.to_s
@@ -331,7 +326,6 @@ if __FILE__ == $0
     j_skill_name = j_skill["name"]
     j_skill_type = j_skill["type"]
     j_skill_effect = j_skill["effect"]
-    j_weapon_type = j_skill["weaponType"]
 
     skill_row = CSV::Row.new(SKILLS_CSV_COLUMN_NAMES, [])
     skill_row["Name"] = j_skill_name
@@ -343,34 +337,13 @@ if __FILE__ == $0
       skill_row["Effect"] = nil
     end
 
-    skill_row["SP Cost"] = j_skill["spCost"] || j_skill["cost"]
+    skill_row["SP"] = j_skill["sp"]
     skill_row["Range"] = j_skill["range"]
-    skill_row["Weapon Might"] = j_skill["might"]
-
-    if j_skill_type != "WEAPON"
-      j_inherit_restriction = j_skill["inheritRestriction"]
-
-      skill_row["Inherit Restriction"] = case j_inherit_restriction
-        when INHERIT_RESTRICTIONS_ONLY_PATTERN
-          "Only #{$1}"
-        when INHERIT_RESTRICTIONS_EXCLUDES_PATTERN
-          j_inherit_restriction
-        when "Is exclusive"
-          "Exclusive"
-        when nil
-          nil
-      end
-    else
-      skill_row["Inherit Restriction"] = if j_skill["exclusive?"] == "No"
-        "Only #{j_weapon_type} Users"
-      else
-        "Exclusive"
-      end
-    end
+    skill_row["Might"] = j_skill["might"]
 
     [4, 5].each do |rarity|
       skill_row["Available At #{rarity}*"] = (skills_by_rarities[rarity - 1][j_skill_name] || []).join(", ") \
-        if j_skill_type != "SEAL"
+        if j_skill_type != "sacredseal"
     end
 
     skills_csv_out << skill_row
