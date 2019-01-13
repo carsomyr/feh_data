@@ -53,7 +53,7 @@ HEADER_MAPPING = {
 }
 
 HERO_WEAPON_TYPE_PATTERN = Regexp.new("\\A(Blue|Green|Red|Colorless)" \
-  " (Axe|Bow|Breath|Lance|Dagger|Staff|Sword|Tome)\\z")
+  " (Axe|Bow|Beast|Breath|Lance|Dagger|Staff|Sword|Tome)\\z")
 
 SKILL_WEAPON_TYPE_PATTERN = Regexp.new("\\A(?:Blue |Green |Red |Colorless |)" \
   "(Axe|Bow|Breath|Lance|Dagger|Staff|Sword|Tome)\\z")
