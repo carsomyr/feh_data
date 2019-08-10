@@ -186,9 +186,6 @@ if __FILE__ == $0
     j_hero["releaseDate"] = nil \
       if j_hero["releaseDate"] == "N/A"
 
-    j_hero["poolDate"] = nil \
-      if j_hero["poolDate"] == "N/A"
-
     j_weapon_type = j_hero["weaponType"]
     m = HERO_WEAPON_TYPE_PATTERN.match(j_weapon_type)
 
@@ -308,16 +305,6 @@ if __FILE__ == $0
 
     hero_row["Release Date"] = Date.parse(release_date).iso8601 \
       if release_date
-
-    pool_date = j_hero["poolDate"]
-
-    if pool_date
-      hero_row["Pool Date"] = Date.parse(pool_date).iso8601
-
-      ([lower_rarity, 3].max..upper_rarity).each do |rarity|
-        hero_row["Rarity_#{rarity}"] = 1
-      end
-    end
 
     heroes_csv_out << hero_row
   end
