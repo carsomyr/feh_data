@@ -252,11 +252,9 @@ function assignIvAndMerges(stats, ivs, ivs1, level) {
       mergedIvNature = ivNature.slice(0);
 
       /* Adjust the flaw (2) to neutral (1). */
-      if (level === 40) {
-        for (var iStat = 0; iStat < stats.length; iStat++) {
-          if (mergedIvNature[iStat] === 2) {
-            mergedIvNature[iStat] = 1;
-          }
+      for (var iStat = 0; iStat < stats.length; iStat++) {
+        if (mergedIvNature[iStat] === 2) {
+          mergedIvNature[iStat] = 1;
         }
       }
     }
